@@ -19,9 +19,27 @@
  **************************************************/
 void poly_freeze(poly *a) {
     unsigned int i;
+    int32_t t;
 
-    for (i = 0; i < N; ++i)
-        a->coeffs[i] = freeze(a->coeffs[i]);
+    /* All call sites pass coefficients in (-2q, 2q):
+     *   - crypto_sign_signature: w = A*y1 + y2 (+/- round(z2), (1-b)c)
+     *     after one unreduced addition of a polynomial with |coeff| < q;
+     *     w0/w0_cb with the small (1-2b)c correction; round(z1)/round(z2)
+     *     with |coeff| < B < q;
+     *   - crypto_sign_verify: A*z1 + (q+1)/2*c*beta after the inverse NTT
+     *     (outputs in (-q, q)) plus one |coeff| < q summand;
+     *   - unpack_sig: recomposed z1 = LowBits + Decompress(HighBits),
+     *     a centered LowBits in (-q, q) plus a mid value in [0, q).
+     * For that domain the Barrett head of freeze() is unnecessary: two
+     * conditional operations (the tail of the reference freeze()) give
+     * the identical canonical representative in [0, q).
+     */
+    for (i = 0; i < N; ++i) {
+        t = a->coeffs[i];
+        t += (t >> 31) & DQ;       /* [0, 2q)  for t in (-2q, 2q) */
+        t -= ~((t - Q) >> 31) & Q; /* [0, q)   for t in [0, 2q)   */
+        a->coeffs[i] = t;
+    }
 }
 
 // 定义多项式的压缩与解压缩---------------------------------------------------------------------------------
