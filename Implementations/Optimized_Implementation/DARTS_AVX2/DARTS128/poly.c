@@ -989,6 +989,17 @@ void poly_unpack_highbits(poly *r, const uint8_t *a) {
  *                            POLY_LOWBITS_PACKEDBYTES bytes
  *              - const poly *a: pointer to input polynomial
  **************************************************/
+/* NOTE on variant equivalence: for DARTS_MODE 128 and 256 the low-bits
+ * decomposition x' = base*x1 + x2 (base = 8 resp. 16) is computed with
+ * signed int32_t division/modulo (x'/base, x'%base) in the reference
+ * implementation and with unsigned uint32_t shifts/masks (x' >> 3, x' & 7
+ * resp. x' >> 4, x' & 15) in the AVX2 implementation. On the valid input
+ * domain x' = x + offset in [0, 2*offset] the two are value-for-value
+ * identical (base is a power of two and the operands are non-negative).
+ * They diverge on out-of-domain negative inputs: C99 signed division
+ * truncates toward zero ((-1)/8 == 0, (-1)%8 == -1) while the unsigned
+ * path wraps to large values. Both implementations rely on the upstream
+ * invariant that this function is only called with in-domain coefficients. */
 void poly_pack_lowbits(uint8_t *r, const poly *a) {
     uint8_t *out = r;
 
