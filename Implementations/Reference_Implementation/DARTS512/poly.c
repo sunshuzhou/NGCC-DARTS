@@ -338,7 +338,12 @@ void poly_neg(poly *r) {
 /*************************************************
  * Name:        poly_q_pack
  *
- * Description: Pack polynomial with coefficients in [0, Q - 1].
+ * Description: Pack polynomial with coefficients in (-Q, Q).
+ *              Inputs in [0, Q - 1] are packed as-is; negative inputs
+ *              (the polyveck_frommont output range of the only caller,
+ *              pack_pk) are lifted by a single conditional addition of Q,
+ *              which is bit-identical to the previous full freeze() for
+ *              every input in the documented range.
  *
  * Arguments:   - uint8_t *r: pointer to output byte array with at least
  *                            POLY_Q_PACKEDBYTES bytes
@@ -350,14 +355,14 @@ void poly_q_pack(uint8_t *r, const poly *a) {
 #if DARTS_MODE == 128 || DARTS_MODE == 256
     // q = 130817, 17 bits
     for (unsigned int i = 0; i < N; i += 8) {
-        uint32_t t0 = (uint32_t)freeze(a->coeffs[i + 0]) & 0x1FFFFu;
-        uint32_t t1 = (uint32_t)freeze(a->coeffs[i + 1]) & 0x1FFFFu;
-        uint32_t t2 = (uint32_t)freeze(a->coeffs[i + 2]) & 0x1FFFFu;
-        uint32_t t3 = (uint32_t)freeze(a->coeffs[i + 3]) & 0x1FFFFu;
-        uint32_t t4 = (uint32_t)freeze(a->coeffs[i + 4]) & 0x1FFFFu;
-        uint32_t t5 = (uint32_t)freeze(a->coeffs[i + 5]) & 0x1FFFFu;
-        uint32_t t6 = (uint32_t)freeze(a->coeffs[i + 6]) & 0x1FFFFu;
-        uint32_t t7 = (uint32_t)freeze(a->coeffs[i + 7]) & 0x1FFFFu;
+        uint32_t t0 = (uint32_t)caddq(a->coeffs[i + 0]) & 0x1FFFFu;
+        uint32_t t1 = (uint32_t)caddq(a->coeffs[i + 1]) & 0x1FFFFu;
+        uint32_t t2 = (uint32_t)caddq(a->coeffs[i + 2]) & 0x1FFFFu;
+        uint32_t t3 = (uint32_t)caddq(a->coeffs[i + 3]) & 0x1FFFFu;
+        uint32_t t4 = (uint32_t)caddq(a->coeffs[i + 4]) & 0x1FFFFu;
+        uint32_t t5 = (uint32_t)caddq(a->coeffs[i + 5]) & 0x1FFFFu;
+        uint32_t t6 = (uint32_t)caddq(a->coeffs[i + 6]) & 0x1FFFFu;
+        uint32_t t7 = (uint32_t)caddq(a->coeffs[i + 7]) & 0x1FFFFu;
 
         r[out +  0] = (uint8_t)(t0);
         r[out +  1] = (uint8_t)(t0 >> 8);
@@ -383,10 +388,10 @@ void poly_q_pack(uint8_t *r, const poly *a) {
 #elif DARTS_MODE == 512
     // q = 260609, 18 bits
     for (unsigned int i = 0; i < N; i += 4) {
-        uint32_t t0 = (uint32_t)freeze(a->coeffs[i + 0]) & 0x3FFFFu;
-        uint32_t t1 = (uint32_t)freeze(a->coeffs[i + 1]) & 0x3FFFFu;
-        uint32_t t2 = (uint32_t)freeze(a->coeffs[i + 2]) & 0x3FFFFu;
-        uint32_t t3 = (uint32_t)freeze(a->coeffs[i + 3]) & 0x3FFFFu;
+        uint32_t t0 = (uint32_t)caddq(a->coeffs[i + 0]) & 0x3FFFFu;
+        uint32_t t1 = (uint32_t)caddq(a->coeffs[i + 1]) & 0x3FFFFu;
+        uint32_t t2 = (uint32_t)caddq(a->coeffs[i + 2]) & 0x3FFFFu;
+        uint32_t t3 = (uint32_t)caddq(a->coeffs[i + 3]) & 0x3FFFFu;
 
         r[out + 0] = (uint8_t)(t0);
         r[out + 1] = (uint8_t)(t0 >> 8);
