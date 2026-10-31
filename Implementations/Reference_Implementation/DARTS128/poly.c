@@ -162,8 +162,32 @@ void poly_mul_1_b(poly *r, const poly *a, uint8_t b) {
 * Arguments:   - poly *r: pointer to in/output polynomial
 **************************************************/
 void poly_ntt(poly *r) {
+    /* Lazy output: the forward NTT butterflies only reduce the twiddle
+     * products (each in (-q, q)), and every coefficient takes part in
+     * exactly one butterfly per layer, so coefficient magnitudes grow by
+     * less than q per layer. With log2(N/2) layers (7 for N = 512, 8 for
+     * N = 1024) and inputs bounded by |coeff| <= 2q (all call sites:
+     * ternary secrets s0/s1/e and negated copies in {-1,0,1}, challenge
+     * c in {-1,0,1}, round(y1) with |coeff| < B < q in the signing loop,
+     * z1 recomposed in crypto_sign_verify with |coeff| < 2q), outputs
+     * satisfy |coeff| < (2 + log2(N/2)) * q  (9q for N = 512, 10q for
+     * N = 1024). The separate canonicalization pass is dropped.
+     *
+     * Every consumer of the NTT representation is congruence-based and
+     * re-canonicalizes before values are used:
+     *   - basemul/baseinv use fqmul/montgomery_reduce arithmetic, valid
+     *     for |a| <= 2^31*q; products of two lazy sums stay below
+     *     (2*10q)^2 < 2^45, well inside that range, and basemul still
+     *     freeze()s each output to canonical [0, q);
+     *   - polyvecl_basemul_acc_montgomery adds canonical basemul outputs,
+     *     so the accumulator results and the inverse NTT inputs are the
+     *     same integers as in the reference pipeline;
+     *   - poly_mul_mont / polyveck_frommont reduce via montgomery_reduce
+     *     with the MONT/MONTSQ factor.
+     * The public key is packed through poly_q_pack, which canonicalizes
+     * every coefficient, so packed and hashed outputs are unchanged.
+     */
 	ntt(r->coeffs);
-	poly_freeze(r);
 }
 
 /*************************************************
